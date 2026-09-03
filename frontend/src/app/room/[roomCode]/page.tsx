@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+
 import socket from "@/lib/socket";
+import VideoPlayer from "@/components/video/VideoPlayer";
 
 
 export default function RoomPage() {
@@ -12,14 +14,22 @@ export default function RoomPage() {
 
   const router = useRouter();
 
+
   const roomCode =
     params.roomCode as string;
+
 
 
   const [status, setStatus] =
     useState(
       "Waiting for partner..."
     );
+
+
+
+  const [role, setRole] =
+    useState("");
+
 
 
 
@@ -37,13 +47,22 @@ export default function RoomPage() {
 
 
 
-    // Guest join করলে নিজের status update
-
-    const role =
+    const savedRole =
       sessionStorage.getItem("role");
 
 
-    if (role === "GUEST") {
+
+    if (savedRole) {
+
+      setRole(savedRole);
+
+    }
+
+
+
+    // Guest join করলে নিজের status update
+
+    if (savedRole === "GUEST") {
 
       setStatus(
         "Partner Connected 🟢"
@@ -68,6 +87,7 @@ export default function RoomPage() {
 
 
 
+
     socket.on(
       "participant:left",
       () => {
@@ -82,7 +102,9 @@ export default function RoomPage() {
 
 
 
+
     return () => {
+
 
       socket.off(
         "participant:joined"
@@ -98,6 +120,7 @@ export default function RoomPage() {
 
 
   }, [roomCode]);
+
 
 
 
@@ -123,9 +146,10 @@ export default function RoomPage() {
 
 
 
+
   return (
 
-    <main className="flex min-h-screen flex-col items-center justify-center gap-5">
+    <main className="flex min-h-screen flex-col items-center justify-center gap-5 p-5">
 
 
       <h1 className="text-4xl font-bold">
@@ -154,6 +178,17 @@ export default function RoomPage() {
 
 
 
+      <VideoPlayer
+
+        roomCode={roomCode}
+
+        isHost={role === "HOST"}
+
+      />
+
+
+
+
 
       <button
 
@@ -170,9 +205,9 @@ export default function RoomPage() {
 
 
 
+
     </main>
 
   );
-
 
 }
