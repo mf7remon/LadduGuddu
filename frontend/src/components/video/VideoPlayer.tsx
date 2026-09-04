@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+
 import socket from "@/lib/socket";
+
+import YoutubePlayer from "./YoutubePlayer";
+
 
 
 interface VideoPlayerProps {
@@ -11,6 +15,46 @@ interface VideoPlayerProps {
   isHost: boolean;
 
 }
+
+
+
+
+
+function extractYoutubeId(url: string) {
+
+  try {
+
+    const parsed = new URL(url);
+
+
+    if(parsed.hostname.includes("youtu.be")) {
+
+      return parsed.pathname.substring(1);
+
+    }
+
+
+    if(parsed.hostname.includes("youtube.com")) {
+
+      return parsed.searchParams.get("v");
+
+    }
+
+
+  } catch(error) {
+
+    return null;
+
+  }
+
+
+  return null;
+
+}
+
+
+
+
 
 
 
@@ -24,24 +68,60 @@ export default function VideoPlayer({
 
 
 
+
+
   const videoRef =
     useRef<HTMLVideoElement | null>(null);
 
 
 
+
+
+  const [videoUrl, setVideoUrl] =
+
+    useState(
+
+      "https://www.w3schools.com/html/mov_bbb.mp4"
+
+    );
+
+
+
+
+
+  const [youtubeId, setYoutubeId] =
+
+    useState<string | null>(null);
+
+
+
+
+
   const [syncStatus, setSyncStatus] =
+
     useState("Ready");
+
+
+
+
+
+
 
 
 
   useEffect(() => {
 
 
+
     const video =
+
       videoRef.current;
 
 
-    if (!video) return;
+
+    if (!video && !youtubeId) return;
+
+
 
 
 
@@ -50,14 +130,25 @@ export default function VideoPlayer({
 
 
 
+
+
+
+
+
     if (!isHost) {
 
 
+
       socket.emit(
+
         "video:request-state",
+
         {
+
           roomCode
+
         }
+
       );
 
 
@@ -68,30 +159,45 @@ export default function VideoPlayer({
 
 
 
-    let interval:any;
 
 
 
-    if (isHost) {
+
+
+    let interval: any;
+
+
+
+
+
+    if (isHost && video) {
+
 
 
       interval = setInterval(() => {
 
 
+
         socket.emit(
+
           "video:sync-check",
+
           {
 
             roomCode,
 
             currentTime:
+
               video.currentTime
 
           }
+
         );
 
 
+
       },5000);
+
 
 
     }
@@ -103,16 +209,79 @@ export default function VideoPlayer({
 
 
 
+
+
+
+
+
+
+
     socket.on(
-      "video:sync-state",
+
+      "video:source-changed",
+
       (data) => {
 
 
-        if (!isHost) {
+
+        const id =
+
+          extractYoutubeId(data.url);
+
+
+
+        if(id){
+
+          setYoutubeId(id);
+
+        }
+
+        else{
+
+          setYoutubeId(null);
+
+          setVideoUrl(data.url);
+
+        }
+
+
+
+        setSyncStatus(
+
+          "Video Loaded ✅"
+
+        );
+
+
+      }
+
+    );
+
+
+
+
+
+
+
+
+
+    socket.on(
+
+      "video:sync-state",
+
+      (data) => {
+
+
+
+        if (!isHost && video) {
+
 
 
           video.currentTime =
+
             data.currentTime;
+
+
 
 
 
@@ -123,13 +292,23 @@ export default function VideoPlayer({
           }
 
 
-          setSyncStatus("Synced ✅");
+
+
+
+          setSyncStatus(
+
+            "Synced ✅"
+
+          );
+
 
 
         }
 
 
+
       }
+
     );
 
 
@@ -139,49 +318,71 @@ export default function VideoPlayer({
 
 
 
+
     socket.on(
+
       "video:sync-update",
+
       (data) => {
 
 
-        if (!isHost) {
+
+        if (!isHost && video) {
+
 
 
           const difference =
+
             Math.abs(
+
               video.currentTime -
+
               data.currentTime
+
             );
+
+
 
 
 
           if (difference > 2) {
 
 
+
             video.currentTime =
+
               data.currentTime;
 
 
+
             setSyncStatus(
+
               "Correcting Sync..."
+
             );
 
 
           } else {
 
 
+
             setSyncStatus(
+
               "Synced ✅"
+
             );
 
 
           }
 
 
+
         }
 
 
+
       }
+
     );
 
 
@@ -191,25 +392,37 @@ export default function VideoPlayer({
 
 
 
+
     socket.on(
+
       "video:play",
+
       () => {
 
 
-        if (!isHost) {
+
+        if (!isHost && video) {
+
 
 
           video.play();
 
+
+
           setSyncStatus(
+
             "Playing ▶️"
+
           );
+
 
 
         }
 
 
+
       }
+
     );
 
 
@@ -219,26 +432,39 @@ export default function VideoPlayer({
 
 
 
+
     socket.on(
+
       "video:pause",
+
       () => {
 
 
-        if (!isHost) {
+
+        if (!isHost && video) {
+
 
 
           video.pause();
 
+
+
           setSyncStatus(
+
             "Paused ⏸️"
+
           );
+
 
 
         }
 
 
+
       }
+
     );
+
 
 
 
@@ -248,27 +474,39 @@ export default function VideoPlayer({
 
 
     socket.on(
+
       "video:seek",
+
       (time) => {
 
 
-        if (!isHost) {
+
+        if (!isHost && video) {
+
 
 
           video.currentTime =
+
             time;
 
 
+
           setSyncStatus(
+
             "Synced ✅"
+
           );
+
 
 
         }
 
 
+
       }
+
     );
+
 
 
 
@@ -280,35 +518,57 @@ export default function VideoPlayer({
     return () => {
 
 
+
       clearInterval(interval);
 
 
+
       socket.off(
+
+        "video:source-changed"
+
+      );
+
+
+      socket.off(
+
         "video:sync-state"
+
       );
 
 
       socket.off(
+
         "video:sync-update"
+
       );
 
 
       socket.off(
+
         "video:play"
+
       );
 
 
       socket.off(
+
         "video:pause"
+
       );
 
 
       socket.off(
+
         "video:seek"
+
       );
+
 
 
     };
+
+
 
 
 
@@ -321,22 +581,32 @@ export default function VideoPlayer({
 
 
 
+
   function handlePlay(){
+
 
 
     if(!isHost) return;
 
 
 
+
+
     socket.emit(
+
       "video:play",
+
       {
+
         roomCode
+
       }
+
     );
 
 
   }
+
 
 
 
@@ -348,19 +618,28 @@ export default function VideoPlayer({
   function handlePause(){
 
 
+
     if(!isHost) return;
 
 
 
+
+
     socket.emit(
+
       "video:pause",
+
       {
+
         roomCode
+
       }
+
     );
 
 
   }
+
 
 
 
@@ -372,24 +651,32 @@ export default function VideoPlayer({
   function handleSeek(){
 
 
+
     if(!isHost) return;
 
 
 
+
+
     socket.emit(
+
       "video:seek",
+
       {
 
         roomCode,
 
         time:
+
           videoRef.current?.currentTime || 0
 
       }
+
     );
 
 
   }
+
 
 
 
@@ -401,28 +688,38 @@ export default function VideoPlayer({
   function handleLoadedMetadata(){
 
 
+
     if(!isHost) return;
 
 
 
+
+
     socket.emit(
+
       "video:send-state",
+
       {
 
         roomCode,
 
         currentTime:
+
           videoRef.current?.currentTime || 0,
 
 
+
         isPlaying:
+
           !videoRef.current?.paused
 
       }
+
     );
 
 
   }
+
 
 
 
@@ -436,33 +733,60 @@ export default function VideoPlayer({
     <div className="w-full max-w-4xl">
 
 
-      <video
+      {
 
-        ref={videoRef}
+        youtubeId ? (
 
-        controls={isHost}
+          <YoutubePlayer
 
-        onPlay={handlePlay}
+            roomCode={roomCode}
 
-        onPause={handlePause}
+            isHost={isHost}
 
-        onSeeked={handleSeek}
+            videoId={youtubeId}
 
-        onLoadedMetadata={handleLoadedMetadata}
+          />
 
-        className="w-full rounded-lg"
 
-      >
+        ) : (
 
-        <source
 
-          src="https://www.w3schools.com/html/mov_bbb.mp4"
+          <video
 
-          type="video/mp4"
+            ref={videoRef}
 
-        />
+            controls={isHost}
 
-      </video>
+            onPlay={handlePlay}
+
+            onPause={handlePause}
+
+            onSeeked={handleSeek}
+
+            onLoadedMetadata={handleLoadedMetadata}
+
+            className="w-full rounded-lg"
+
+          >
+
+            <source
+
+              src={videoUrl}
+
+              type="video/mp4"
+
+            />
+
+          </video>
+
+
+        )
+
+      }
+
+
+
+
 
 
 
@@ -471,6 +795,9 @@ export default function VideoPlayer({
         {syncStatus}
 
       </p>
+
+
+
 
 
     </div>

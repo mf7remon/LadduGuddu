@@ -1,5 +1,6 @@
 "use client";
 
+import VideoSelector from "@/components/video/VideoSelector";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
@@ -176,6 +177,13 @@ export default function RoomPage() {
       </p>
 
 
+<VideoSelector
+
+  roomCode={roomCode}
+
+  isHost={role === "HOST"}
+
+/>
 
 
       <VideoPlayer
